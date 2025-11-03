@@ -42,20 +42,15 @@ impl Data {
         true
     }
 
-    pub fn compute(&mut self) {
-        self.values.iter().for_each(|value| {
-            value.split_whitespace().for_each(|word| {
-                let word_hash = murmur3_x64_128_of_slice(word.as_bytes(), 0);
-                let step_hash = word_hash as u64 as u128;
-                let mut hash = word_hash.shr(64);
-                for _ in 0..BLOOM_HASHES {
-                    let normalized_hash = (hash % BLOOM_SIZE) as usize;
-                    self.bloom[normalized_hash / 128]
-                        .bitor_assign(1u128.shl(normalized_hash % 128));
+    pub fn bloom_insert(&mut self, target: &str) {
+        let word_hash = murmur3_x64_128_of_slice(target.as_bytes(), 0);
+        let step_hash = word_hash as u64 as u128;
+        let mut hash = word_hash.shr(64);
+        for _ in 0..BLOOM_HASHES {
+            let normalized_hash = (hash % BLOOM_SIZE) as usize;
+            self.bloom[normalized_hash / 128].bitor_assign(1u128.shl(normalized_hash % 128));
 
-                    hash += step_hash;
-                }
-            });
-        });
+            hash += step_hash;
+        }
     }
 }

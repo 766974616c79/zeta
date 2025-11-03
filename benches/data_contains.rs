@@ -35,7 +35,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         ),
     ]);
 
-    d.compute();
+    d.bloom_insert("sagittis");
 
     c.bench_function("data contains", |b| b.iter(|| d.contains("sagittis")));
     c.bench_function("data bloom contains", |b| {
