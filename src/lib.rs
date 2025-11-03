@@ -7,6 +7,7 @@ const BLOOM_HASHES: u128 = 3;
 
 pub struct Data {
     pub values: Vec<String>,
+    // TODO: Don't use u8 array but u128 array with bitset
     pub bloom: [u8; BLOOM_SIZE as usize],
 }
 
