@@ -1,7 +1,6 @@
 use murmur3::murmur3_x64_128_of_slice;
 
-// TODO: https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/
-// TODO: https://stackoverflow.com/questions/11954086/which-hash-functions-to-use-in-a-bloom-filter
+// Thanks: https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/ && https://github.com/Claudenw/BloomFilters/wiki/Bloom-Filters----An-overview
 
 const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
