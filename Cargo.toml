@@ -3,4 +3,12 @@ name = "zeta"
 version = "0.1.0"
 edition = "2024"
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "data_contains"
+harness = false
+
 [dependencies]
+murmur3 = { git = "https://github.com/stusmall/murmur3.git" }

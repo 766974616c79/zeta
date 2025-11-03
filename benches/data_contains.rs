@@ -1,6 +1,7 @@
+use criterion::{Criterion, criterion_group, criterion_main};
 use zeta::Data;
 
-fn main() {
+fn criterion_benchmark(c: &mut Criterion) {
     let mut d = Data {
         values: vec![
             String::from(
@@ -39,6 +40,11 @@ fn main() {
 
     d.compute();
 
-    println!("{:?}", d.contains("sagittis"));
-    println!("{:?}", d.bloom_contains("sagittis"));
+    c.bench_function("data contains", |b| b.iter(|| d.contains("sagittis")));
+    c.bench_function("data bloom contains", |b| {
+        b.iter(|| d.bloom_contains("sagittis"))
+    });
 }
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);
