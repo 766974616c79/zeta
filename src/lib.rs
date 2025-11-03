@@ -2,16 +2,22 @@ use murmur3::murmur3_x64_128_of_slice;
 
 // Thanks: https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/ && https://github.com/Claudenw/BloomFilters/wiki/Bloom-Filters----An-overview
 
-const BLOOM_SIZE: u128 = 128_966;
+pub const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
 
 pub struct Data {
     pub values: Vec<String>,
-    // TODO: Don't use u8 array but u128 array with bitset
-    pub bloom: [u8; BLOOM_SIZE as usize],
+    pub bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
 }
 
 impl Data {
+    pub fn new(values: Vec<String>) -> Self {
+        Self {
+            values,
+            bloom: [0; usize::div_ceil(BLOOM_SIZE as usize, 128)],
+        }
+    }
+
     pub fn contains(&self, target: &str) -> bool {
         self.values.iter().any(|value| value.contains(target))
     }
@@ -21,11 +27,13 @@ impl Data {
         let step_hash = word_hash as u64 as u128;
         let mut hash = word_hash >> 64;
         for _ in 0..BLOOM_HASHES {
-            hash += step_hash * BLOOM_HASHES;
-
-            if self.bloom[(hash % BLOOM_SIZE) as usize] == 0 {
+            let normalized_hash = (hash % BLOOM_SIZE) as usize;
+            let pos = normalized_hash % 128;
+            if (self.bloom[normalized_hash / 128] & 1 << pos) >> pos == 0 {
                 return false;
             }
+
+            hash += step_hash;
         }
 
         true
@@ -38,9 +46,10 @@ impl Data {
                 let step_hash = word_hash as u64 as u128;
                 let mut hash = word_hash >> 64;
                 for _ in 0..BLOOM_HASHES {
-                    hash += step_hash * BLOOM_HASHES;
+                    let normalized_hash = (hash % BLOOM_SIZE) as usize;
+                    self.bloom[normalized_hash / 128] |= 1 << normalized_hash % 128;
 
-                    self.bloom[(hash % BLOOM_SIZE) as usize] = 1;
+                    hash += step_hash;
                 }
             });
         });
