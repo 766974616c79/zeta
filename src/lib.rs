@@ -1,4 +1,5 @@
 use murmur3::murmur3_x64_128_of_slice;
+use std::ops::{BitAnd, BitOrAssign, Shl, Shr};
 
 // Thanks: https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/ && https://github.com/Claudenw/BloomFilters/wiki/Bloom-Filters----An-overview
 
@@ -25,11 +26,11 @@ impl Data {
     pub fn bloom_contains(&self, target: &str) -> bool {
         let word_hash = murmur3_x64_128_of_slice(target.as_bytes(), 0);
         let step_hash = word_hash as u64 as u128;
-        let mut hash = word_hash >> 64;
+        let mut hash = word_hash.shr(64);
         for _ in 0..BLOOM_HASHES {
             let normalized_hash = (hash % BLOOM_SIZE) as usize;
             let pos = normalized_hash % 128;
-            if (self.bloom[normalized_hash / 128] & 1 << pos) >> pos == 0 {
+            if self.bloom[normalized_hash / 128].shr(pos).bitand(1) == 0 {
                 return false;
             }
 
@@ -44,10 +45,11 @@ impl Data {
             value.split_whitespace().for_each(|word| {
                 let word_hash = murmur3_x64_128_of_slice(word.as_bytes(), 0);
                 let step_hash = word_hash as u64 as u128;
-                let mut hash = word_hash >> 64;
+                let mut hash = word_hash.shr(64);
                 for _ in 0..BLOOM_HASHES {
                     let normalized_hash = (hash % BLOOM_SIZE) as usize;
-                    self.bloom[normalized_hash / 128] |= 1 << normalized_hash % 128;
+                    self.bloom[normalized_hash / 128]
+                        .bitor_assign(1u128.shl(normalized_hash % 128));
 
                     hash += step_hash;
                 }
