@@ -1,8 +1,8 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use zeta::Data;
+//use zeta::Data;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut d = Data::new(vec![
+    /*let mut d = Data::new(vec![
         String::from(
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus suscipit justo a magna dapibus, in porta ipsum auctor. Proin in ornare est. Vivamus vestibulum felis orci, at mattis nisl consequat in. Sed laoreet pretium urna, id volutpat libero vulputate ac. Aliquam tempus ex ac dolor dignissim ornare. Nullam vel nisl leo. Pellentesque sed justo tortor. Donec id quam arcu.",
         ),
@@ -40,7 +40,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("data contains", |b| b.iter(|| d.contains("sagittis")));
     c.bench_function("data bloom contains", |b| {
         b.iter(|| d.bloom_contains("sagittis"))
-    });
+    });*/
 }
 
 criterion_group!(benches, criterion_benchmark);
