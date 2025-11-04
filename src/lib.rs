@@ -1,5 +1,8 @@
 use murmur3::murmur3_x64_128_of_slice;
-use std::ops::{BitAnd, BitOrAssign, Shl, Shr};
+use std::{
+    fmt::Debug,
+    ops::{BitAnd, BitOrAssign, Shl, Shr},
+};
 
 // Thanks:
 // - https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/
@@ -22,7 +25,7 @@ impl Block {
             .collect();
 
         normalized_value.split_ascii_whitespace().for_each(|word| {
-            self.bloom_insert(&word);
+            self.bloom_insert(word);
         });
 
         self.values.push(value);
@@ -67,6 +70,12 @@ impl Default for Block {
     }
 }
 
+impl Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Block (len = {})", self.values.len())
+    }
+}
+
 #[derive(Default)]
 pub struct Database {
     blocks: Vec<Block>,
@@ -77,6 +86,7 @@ impl Database {
         if let Some(block) = self
             .blocks
             .iter_mut()
+            .rev()
             .find(|block| block.values.len() != BLOCK_SIZE)
         {
             block.insert(value);
@@ -88,14 +98,19 @@ impl Database {
         }
     }
 
-    pub fn contains(&self, value: &str) -> bool {
-        value.split_ascii_whitespace().all(|word| {
-            let normalized_word: String =
-                word.chars().filter(|c| !c.is_ascii_punctuation()).collect();
+    pub fn get(&self, value: &str) -> Vec<&String> {
+        let normalized_value: String = value
+            .chars()
+            .filter(|c| !c.is_ascii_punctuation())
+            .collect();
 
-            self.blocks
-                .iter()
-                .any(|category| category.bloom_contains(&normalized_word))
-        })
+        let words: Vec<&str> = normalized_value.split_ascii_whitespace().collect();
+        self.blocks
+            .iter()
+            .rev()
+            .filter(|block| words.iter().all(|word| block.bloom_contains(word)))
+            .flat_map(|block| &block.values)
+            .filter(|sentence| words.iter().all(|word| sentence.contains(word)))
+            .collect()
     }
 }
