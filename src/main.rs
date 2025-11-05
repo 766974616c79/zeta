@@ -1,5 +1,6 @@
 use zeta::Database;
 
+#[cfg_attr(feature = "hotpath", hotpath::main(percentiles = [99]))]
 fn main() {
     let mut database = Database::default();
     for _ in 0..1_000_000 {
@@ -14,5 +15,7 @@ fn main() {
 
     database.insert(String::from("Hello"));
 
-    println!("{:?}", database.get("Praesent a"));
+    for i in 0..1000 {
+        println!("{:?}", database.get("Praesent a"));
+    }
 }

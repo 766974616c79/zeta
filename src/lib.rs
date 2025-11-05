@@ -98,6 +98,7 @@ impl Database {
         }
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure)]
     pub fn get(&self, value: &str) -> Vec<&String> {
         let normalized_value: String = value
             .chars()

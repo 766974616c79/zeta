@@ -12,3 +12,11 @@ harness = false
 
 [dependencies]
 murmur3 = { git = "https://github.com/stusmall/murmur3.git" }
+hotpath = { version = "0.5", optional = true }
+
+[features]
+hotpath = ["dep:hotpath", "hotpath/hotpath"]
+hotpath-alloc-bytes-total = ["hotpath/hotpath-alloc-bytes-total"]
+hotpath-alloc-count-total = ["hotpath/hotpath-alloc-count-total"]
+hotpath-alloc-self = ["hotpath/hotpath-alloc-self"]
+hotpath-off = ["hotpath/hotpath-off"]
