@@ -15,7 +15,7 @@ fn main() {
 
     database.insert(String::from("Hello"));
 
-    for _ in 0..1000 {
-        println!("{:?}", database.get("Praesent a").len());
+    for _ in 0..1_000_000 {
+        println!("{:?}", database.get("consectetur").len());
     }
 }
