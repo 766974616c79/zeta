@@ -65,6 +65,7 @@ impl Block {
         }
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure)]
     fn index_insert(&mut self, target: String, value: usize) {
         match self.indexes.entry(target) {
             Entry::Occupied(mut entry) => {
