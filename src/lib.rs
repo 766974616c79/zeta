@@ -70,8 +70,9 @@ impl Block {
         match self.indexes.entry(target) {
             Entry::Occupied(mut entry) => {
                 let values = entry.get_mut();
-                if !values.contains(&value) {
+                if let Err(_) = values.binary_search(&value) {
                     values.push(value);
+                    values.sort();
                 }
             }
             Entry::Vacant(entry) => {
