@@ -105,11 +105,8 @@ pub struct Database {
 
 impl Database {
     pub fn insert(&mut self, value: String) {
-        if let Some(block) = self
-            .blocks
-            .iter_mut()
-            .rev()
-            .find(|block| block.values.len() != BLOCK_SIZE)
+        if let Some(block) = self.blocks.last_mut()
+            && block.values.len() != BLOCK_SIZE
         {
             block.insert(value);
         } else {
