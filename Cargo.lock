@@ -1766,4 +1766,5 @@ dependencies = [
  "criterion",
  "hotpath",
  "murmur3",
+ "rayon",
 ]

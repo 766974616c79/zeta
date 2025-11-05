@@ -1,5 +1,6 @@
 use ahash::AHashMap;
 use murmur3::murmur3_x64_128_of_slice;
+use rayon::prelude::*;
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
@@ -72,7 +73,7 @@ impl Block {
                 let values = entry.get_mut();
                 if let Err(_) = values.binary_search(&value) {
                     values.push(value);
-                    values.sort_unstable();
+                    values.par_sort_unstable();
                 }
             }
             Entry::Vacant(entry) => {
