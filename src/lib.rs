@@ -72,7 +72,7 @@ impl Block {
                 let values = entry.get_mut();
                 if let Err(_) = values.binary_search(&value) {
                     values.push(value);
-                    values.sort();
+                    values.sort_unstable();
                 }
             }
             Entry::Vacant(entry) => {
