@@ -21,3 +21,6 @@ hotpath-alloc-bytes-total = ["hotpath/hotpath-alloc-bytes-total"]
 hotpath-alloc-count-total = ["hotpath/hotpath-alloc-count-total"]
 hotpath-alloc-self = ["hotpath/hotpath-alloc-self"]
 hotpath-off = ["hotpath/hotpath-off"]
+
+[profile.release]
+debug = true
