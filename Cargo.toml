@@ -7,7 +7,7 @@ edition = "2024"
 criterion = { version = "0.7", features = ["html_reports"] }
 
 [[bench]]
-name = "data_contains"
+name = "database"
 harness = false
 
 [dependencies]
