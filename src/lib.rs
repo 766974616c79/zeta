@@ -1,8 +1,12 @@
 use ahash::AHashMap;
+use bytes::{BufMut, BytesMut};
+use lz4_flex::compress_prepend_size;
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
+    fs::{self, OpenOptions},
+    io::Write,
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
 
@@ -70,7 +74,7 @@ impl Block {
         match self.indexes.entry(target) {
             Entry::Occupied(mut entry) => {
                 let values = entry.get_mut();
-                if let Err(_) = values.binary_search(&value) {
+                if values.binary_search(&value).is_err() {
                     values.push(value);
                     values.sort_unstable();
                 }
@@ -144,5 +148,29 @@ impl Database {
                     .collect::<Vec<&String>>()
             })
             .collect()
+    }
+
+    pub fn save(&self) {
+        fs::create_dir_all("blocks").unwrap(); // TODO: Remove unwrap
+
+        self.blocks.iter().enumerate().for_each(|(index, block)| {
+            let mut file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(format!("blocks/{index}.zeta"))
+                .unwrap(); // TODO: Remove unwrap
+
+            let mut buffer = BytesMut::new();
+            buffer.put_u16(block.values.len() as u16);
+
+            block.values.iter().for_each(|value| {
+                buffer.put_u64(value.len() as u64);
+                buffer.put(&compress_prepend_size(value.as_bytes())[..]);
+            });
+
+            file.write_all(&buffer).unwrap(); // TODO: Remove unwrap
+            file.flush().unwrap(); // TODO: Remove unwrap
+        });
     }
 }
