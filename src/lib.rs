@@ -1,5 +1,6 @@
 use ahash::AHashMap;
 use murmur3::murmur3_x64_128_of_slice;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
@@ -131,7 +132,7 @@ impl Database {
         self.blocks
             .iter()
             .rev()
-            .filter(|block| words.iter().all(|word| block.bloom_contains(word)))
+            .filter(|block| words.par_iter().all(|word| block.bloom_contains(word)))
             .flat_map(|block| {
                 words
                     .iter()
