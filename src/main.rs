@@ -15,7 +15,7 @@ fn main() {
 
     database.insert(String::from("Hello"));
 
-    for i in 0..1000 {
-        println!("{:?}", database.get("Praesent a"));
+    for _ in 0..1000 {
+        println!("{:?}", database.get("Praesent a").len());
     }
 }

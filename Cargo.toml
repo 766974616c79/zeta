@@ -13,6 +13,7 @@ harness = false
 [dependencies]
 murmur3 = { git = "https://github.com/stusmall/murmur3.git" }
 hotpath = { version = "0.5", optional = true }
+ahash = "0.8.12"
 
 [features]
 hotpath = ["dep:hotpath", "hotpath/hotpath"]

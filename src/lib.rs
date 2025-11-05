@@ -1,5 +1,7 @@
+use ahash::AHashMap;
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
+    collections::hash_map::Entry,
     fmt::Debug,
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
@@ -14,6 +16,7 @@ const BLOCK_SIZE: usize = 8_192;
 
 struct Block {
     values: Vec<String>,
+    indexes: AHashMap<String, Vec<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
 }
 
@@ -24,8 +27,10 @@ impl Block {
             .filter(|c| !c.is_ascii_punctuation())
             .collect();
 
+        let index = self.values.len();
         normalized_value.split_ascii_whitespace().for_each(|word| {
             self.bloom_insert(word);
+            self.index_insert(word.to_string(), index);
         });
 
         self.values.push(value);
@@ -59,12 +64,27 @@ impl Block {
             hash += step_hash;
         }
     }
+
+    fn index_insert(&mut self, target: String, value: usize) {
+        match self.indexes.entry(target) {
+            Entry::Occupied(mut entry) => {
+                let values = entry.get_mut();
+                if !values.contains(&value) {
+                    values.push(value);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(vec![value]);
+            }
+        }
+    }
 }
 
 impl Default for Block {
     fn default() -> Self {
         Self {
             values: Vec::with_capacity(BLOCK_SIZE),
+            indexes: Default::default(),
             bloom: [0; usize::div_ceil(BLOOM_SIZE as usize, 128)],
         }
     }
@@ -110,8 +130,21 @@ impl Database {
             .iter()
             .rev()
             .filter(|block| words.iter().all(|word| block.bloom_contains(word)))
-            .flat_map(|block| &block.values)
-            .filter(|sentence| words.iter().all(|word| sentence.contains(word)))
+            .flat_map(|block| {
+                words
+                    .iter()
+                    .flat_map(|word| {
+                        if let Some(indexes) = block.indexes.get(*word) {
+                            indexes
+                                .iter()
+                                .map(|index| block.values.get(*index).unwrap())
+                                .collect()
+                        } else {
+                            Vec::new()
+                        }
+                    })
+                    .collect::<Vec<&String>>()
+            })
             .collect()
     }
 }
