@@ -1778,7 +1778,6 @@ name = "zeta"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "bytes",
  "criterion",
  "hotpath",
  "lz4_flex",

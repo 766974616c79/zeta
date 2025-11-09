@@ -1,12 +1,11 @@
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
 use lz4_flex::compress_prepend_size;
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
-    fs::{self, OpenOptions},
-    io::Write,
+    fs::OpenOptions,
+    io::{BufReader, BufWriter, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
 
@@ -150,7 +149,78 @@ impl Database {
             .collect()
     }
 
-    pub fn save(&self) {
+    pub fn load_indexes(&mut self) {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(format!("indexes.zeta"))
+            .unwrap(); // TODO: Remove unwrap
+
+        let mut buffer = BufReader::new(file);
+        let mut blocks_len_buffer = [0; 8];
+        buffer.read_exact(&mut blocks_len_buffer).unwrap();
+
+        for _ in 0..usize::from_le_bytes(blocks_len_buffer) {
+            let mut block = Block::default();
+            let mut indexes_len_buffer = [0; 8];
+            buffer.read_exact(&mut indexes_len_buffer).unwrap();
+
+            for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
+                let mut word_len_buffer = [0; 8];
+                buffer.read_exact(&mut word_len_buffer).unwrap();
+
+                let word_len = usize::from_le_bytes(word_len_buffer);
+                let mut word_buffer: Vec<u8> = Vec::new();
+                word_buffer.resize_with(word_len, Default::default); // todo: review
+
+                buffer.read_exact(&mut word_buffer).unwrap();
+
+                let word = String::from_utf8(word_buffer).unwrap();
+                let mut indexes_len_buffer = [0; 8];
+                buffer.read_exact(&mut indexes_len_buffer).unwrap();
+
+                for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
+                    let mut index_buffer = [0; 8];
+                    buffer.read_exact(&mut index_buffer).unwrap();
+
+                    block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
+                }
+            }
+
+            self.blocks.push(block);
+        }
+    }
+
+    pub fn save_indexes(&self) {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(format!("indexes.zeta"))
+            .unwrap(); // TODO: Remove unwrap
+
+        let mut buffer = BufWriter::new(file);
+        buffer.write_all(&self.blocks.len().to_le_bytes()).unwrap(); // TODO: Remove unwrap
+
+        self.blocks.iter().for_each(|block| {
+            buffer
+                .write_all(&block.indexes.len().to_le_bytes())
+                .unwrap(); // TODO: 2**64 is big & Remove unwrap
+
+            block.indexes.iter().for_each(|(word, indexes)| {
+                buffer.write_all(&word.len().to_le_bytes()).unwrap(); // TODO: 2**64 is big & Remove unwrap
+                buffer.write_all(word.as_bytes()).unwrap(); // TODO: Remove unwrap
+                buffer.write_all(&indexes.len().to_le_bytes()).unwrap(); // TODO: Remove unwrap
+
+                indexes.iter().for_each(|index| {
+                    buffer.write_all(&index.to_le_bytes()).unwrap(); // TODO: Remove unwrap
+                });
+            });
+        });
+
+        buffer.flush().unwrap(); // TODO: Remove unwrap
+    }
+
+    /*pub fn save(&self) {
         fs::create_dir_all("blocks").unwrap(); // TODO: Remove unwrap
 
         self.blocks.iter().enumerate().for_each(|(index, block)| {
@@ -172,5 +242,5 @@ impl Database {
             file.write_all(&buffer).unwrap(); // TODO: Remove unwrap
             file.flush().unwrap(); // TODO: Remove unwrap
         });
-    }
+    }*/
 }
