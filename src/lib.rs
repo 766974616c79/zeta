@@ -152,10 +152,7 @@ impl Database {
     }
 
     pub fn load_indexes(&mut self) {
-        let file = OpenOptions::new()
-            .read(true)
-            .open(format!("indexes.zeta"))
-            .unwrap(); // TODO: Remove unwrap
+        let file = OpenOptions::new().read(true).open("indexes.zeta").unwrap(); // TODO: Remove unwrap
 
         let mut buffer = BufReader::new(file);
         let mut blocks_len_buffer = [0; 8];
@@ -196,7 +193,8 @@ impl Database {
             .read(true)
             .write(true)
             .create(true)
-            .open(format!("indexes.zeta"))
+            .truncate(true)
+            .open("indexes.zeta")
             .unwrap(); // TODO: Remove unwrap
 
         let mut buffer = BufWriter::new(file);
