@@ -17,7 +17,9 @@ pub const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
 const BLOCK_SIZE: usize = 8_192;
 
-struct Block {
+#[derive(Debug)]
+pub struct Block {
+    // todo: remove pub
     values: Vec<String>,
     indexes: AHashMap<String, Vec<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
@@ -95,15 +97,15 @@ impl Default for Block {
     }
 }
 
-impl Debug for Block {
+/*impl Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Block (len = {})", self.values.len())
     }
-}
+}*/
 
 #[derive(Default)]
 pub struct Database {
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>, // todo: remove pub
 }
 
 impl Database {
@@ -159,34 +161,35 @@ impl Database {
         let mut blocks_len_buffer = [0; 8];
         buffer.read_exact(&mut blocks_len_buffer).unwrap();
 
-        for _ in 0..usize::from_le_bytes(blocks_len_buffer) {
-            let mut block = Block::default();
-            let mut indexes_len_buffer = [0; 8];
-            buffer.read_exact(&mut indexes_len_buffer).unwrap();
-
-            for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
-                let mut word_len_buffer = [0; 8];
-                buffer.read_exact(&mut word_len_buffer).unwrap();
-
-                let word_len = usize::from_le_bytes(word_len_buffer);
-                let mut word_buffer: Vec<u8> = Vec::new();
-                word_buffer.resize_with(word_len, Default::default); // todo: review
-
-                buffer.read_exact(&mut word_buffer).unwrap();
-
-                let word = String::from_utf8(word_buffer).unwrap();
+        for i in 0..usize::from_le_bytes(blocks_len_buffer) {
+            if let Some(block) = self.blocks.get_mut(i) {
                 let mut indexes_len_buffer = [0; 8];
                 buffer.read_exact(&mut indexes_len_buffer).unwrap();
 
                 for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
-                    let mut index_buffer = [0; 8];
-                    buffer.read_exact(&mut index_buffer).unwrap();
+                    let mut word_len_buffer = [0; 8];
+                    buffer.read_exact(&mut word_len_buffer).unwrap();
 
-                    block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
+                    let word_len = usize::from_le_bytes(word_len_buffer);
+                    let mut word_buffer: Vec<u8> = Vec::new();
+                    word_buffer.resize_with(word_len, Default::default); // todo: review
+
+                    buffer.read_exact(&mut word_buffer).unwrap();
+
+                    let word = String::from_utf8(word_buffer).unwrap();
+                    let mut indexes_len_buffer = [0; 8];
+                    buffer.read_exact(&mut indexes_len_buffer).unwrap();
+
+                    for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
+                        let mut index_buffer = [0; 8];
+                        buffer.read_exact(&mut index_buffer).unwrap();
+
+                        block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
+                    }
                 }
-            }
 
-            self.blocks.push(block);
+                println!("{:?}", block);
+            }
         }
     }
 
