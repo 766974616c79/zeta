@@ -171,9 +171,7 @@ impl Database {
                     buffer.read_exact(&mut word_len_buffer).unwrap();
 
                     let word_len = usize::from_le_bytes(word_len_buffer);
-                    let mut word_buffer: Vec<u8> = Vec::new();
-                    word_buffer.resize_with(word_len, Default::default); // todo: review
-
+                    let mut word_buffer = vec![0; word_len];
                     buffer.read_exact(&mut word_buffer).unwrap();
 
                     let word = String::from_utf8(word_buffer).unwrap();
