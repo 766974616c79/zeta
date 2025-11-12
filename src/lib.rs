@@ -153,8 +153,7 @@ impl Database {
 
     pub fn load_indexes(&mut self) {
         let file = OpenOptions::new().read(true).open("indexes.zeta").unwrap(); // TODO: Remove unwrap
-
-        let mut buffer = BufReader::new(file);
+        let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut blocks_len_buffer = [0; 8];
         buffer.read_exact(&mut blocks_len_buffer).unwrap();
 
@@ -197,7 +196,7 @@ impl Database {
             .open("indexes.zeta")
             .unwrap(); // TODO: Remove unwrap
 
-        let mut buffer = BufWriter::new(file);
+        let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
         buffer.write_all(&self.blocks.len().to_le_bytes()).unwrap(); // TODO: Remove unwrap
 
         self.blocks.iter().for_each(|block| {
