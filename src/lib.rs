@@ -1,11 +1,10 @@
 use ahash::AHashMap;
-use lz4_flex::compress_prepend_size;
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
     fs::OpenOptions,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{self, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
 
@@ -151,32 +150,32 @@ impl Database {
             .collect()
     }
 
-    pub fn load_indexes(&mut self) {
-        let file = OpenOptions::new().read(true).open("indexes.zeta").unwrap(); // TODO: Remove unwrap
+    pub fn load_indexes(&mut self) -> Result<(), io::Error> {
+        let file = OpenOptions::new().read(true).open("indexes.zeta")?;
         let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut blocks_len_buffer = [0; 8];
-        buffer.read_exact(&mut blocks_len_buffer).unwrap();
+        buffer.read_exact(&mut blocks_len_buffer)?;
 
         for i in 0..usize::from_le_bytes(blocks_len_buffer) {
             if let Some(block) = self.blocks.get_mut(i) {
                 let mut indexes_len_buffer = [0; 8];
-                buffer.read_exact(&mut indexes_len_buffer).unwrap();
+                buffer.read_exact(&mut indexes_len_buffer)?;
 
                 for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
                     let mut word_len_buffer = [0; 8];
-                    buffer.read_exact(&mut word_len_buffer).unwrap();
+                    buffer.read_exact(&mut word_len_buffer)?;
 
                     let word_len = usize::from_le_bytes(word_len_buffer);
                     let mut word_buffer = vec![0; word_len];
-                    buffer.read_exact(&mut word_buffer).unwrap();
+                    buffer.read_exact(&mut word_buffer)?;
 
                     let word = String::from_utf8(word_buffer).unwrap();
                     let mut indexes_len_buffer = [0; 8];
-                    buffer.read_exact(&mut indexes_len_buffer).unwrap();
+                    buffer.read_exact(&mut indexes_len_buffer)?;
 
                     for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
                         let mut index_buffer = [0; 8];
-                        buffer.read_exact(&mut index_buffer).unwrap();
+                        buffer.read_exact(&mut index_buffer)?;
 
                         block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
                     }
@@ -185,37 +184,38 @@ impl Database {
                 println!("{:?}", block);
             }
         }
+
+        Ok(())
     }
 
-    pub fn save_indexes(&self) {
+    pub fn save_indexes(&self) -> Result<(), io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(true)
-            .open("indexes.zeta")
-            .unwrap(); // TODO: Remove unwrap
+            .open("indexes.zeta")?;
 
         let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
-        buffer.write_all(&self.blocks.len().to_le_bytes()).unwrap(); // TODO: Remove unwrap
+        buffer.write_all(&self.blocks.len().to_le_bytes())?;
 
-        self.blocks.iter().for_each(|block| {
-            buffer
-                .write_all(&block.indexes.len().to_le_bytes())
-                .unwrap(); // TODO: 2**64 is big & Remove unwrap
+        self.blocks.iter().try_for_each(|block| {
+            buffer.write_all(&block.indexes.len().to_le_bytes())?; // TODO: 2**64 is big
 
-            block.indexes.iter().for_each(|(word, indexes)| {
-                buffer.write_all(&word.len().to_le_bytes()).unwrap(); // TODO: 2**64 is big & Remove unwrap
-                buffer.write_all(word.as_bytes()).unwrap(); // TODO: Remove unwrap
-                buffer.write_all(&indexes.len().to_le_bytes()).unwrap(); // TODO: Remove unwrap
+            block.indexes.iter().try_for_each(|(word, indexes)| {
+                buffer.write_all(&word.len().to_le_bytes())?; // TODO: 2**64 is big
+                buffer.write_all(word.as_bytes())?;
+                buffer.write_all(&indexes.len().to_le_bytes())?;
 
-                indexes.iter().for_each(|index| {
-                    buffer.write_all(&index.to_le_bytes()).unwrap(); // TODO: Remove unwrap
-                });
-            });
-        });
+                indexes
+                    .iter()
+                    .try_for_each(|index| buffer.write_all(&index.to_le_bytes()))
+            })
+        })?;
 
-        buffer.flush().unwrap(); // TODO: Remove unwrap
+        buffer.flush()?;
+
+        Ok(())
     }
 
     /*pub fn save(&self) {

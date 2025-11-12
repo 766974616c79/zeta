@@ -18,7 +18,7 @@ fn main() {
     // database.insert(String::from("hello arthur"));
     // database.save_indexes();
     database.blocks.push(Default::default());
-    database.load_indexes();
+    database.load_indexes().unwrap();
 
     /*for _ in 0..10_000_000 {
         let test = database.get("Hello").len();
