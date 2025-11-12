@@ -4,7 +4,7 @@ use std::{
     collections::hash_map::Entry,
     fmt::Debug,
     fs::{self, OpenOptions},
-    io::{self, Read, Write},
+    io::{self, BufReader, BufWriter, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
 
@@ -148,6 +148,35 @@ impl Database {
             .collect()
     }
 
+    pub fn load_bloom(&mut self) -> Result<(), io::Error> {
+        let file = OpenOptions::new().read(true).open("bloom.zeta")?;
+        let mut buffer = BufReader::new(file);
+        let mut blocks_len_buffer = [0; 8];
+        buffer.read_exact(&mut blocks_len_buffer)?;
+
+        for _ in 0..usize::from_le_bytes(blocks_len_buffer) {
+            let mut bloom = [0; usize::div_ceil(BLOOM_SIZE as usize, 128)];
+            for i in 0..usize::div_ceil(BLOOM_SIZE as usize, 128) {
+                let mut bitset_buffer = [0; 16];
+                buffer.read_exact(&mut bitset_buffer)?;
+
+                bloom[i] = u128::from_le_bytes(bitset_buffer);
+            }
+
+            let block = Block {
+                values: Vec::new(),
+                indexes: Default::default(),
+                bloom,
+            };
+
+            self.blocks.push(block);
+        }
+
+        println!("{:?}", self.blocks);
+
+        Ok(())
+    }
+
     pub fn load_indexes(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new().read(true).open("indexes.zeta")?;
         let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
@@ -182,6 +211,27 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    pub fn save_bloom(&self) -> Result<(), io::Error> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("bloom.zeta")?;
+
+        let mut buffer = BufWriter::new(file);
+        buffer.write_all(&self.blocks.len().to_le_bytes())?;
+
+        self.blocks.iter().try_for_each(|block| {
+            block
+                .bloom
+                .iter()
+                .try_for_each(|bitset| buffer.write_all(&bitset.to_le_bytes()))
+        })?;
+
+        buffer.flush()
     }
 
     pub fn save_indexes(&self) -> Result<(), io::Error> {
