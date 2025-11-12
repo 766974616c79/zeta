@@ -172,8 +172,6 @@ impl Database {
             self.blocks.push(block);
         }
 
-        println!("{:?}", self.blocks);
-
         Ok(())
     }
 
@@ -213,7 +211,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn save_bloom(&self) -> Result<(), io::Error> {
+    fn save_bloom(&self) -> Result<(), io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -234,7 +232,7 @@ impl Database {
         buffer.flush()
     }
 
-    pub fn save_indexes(&self) -> Result<(), io::Error> {
+    fn save_indexes(&self) -> Result<(), io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -259,13 +257,14 @@ impl Database {
             })
         })?;
 
-        buffer.flush()?;
-
-        Ok(())
+        buffer.flush()
     }
 
     pub fn save(&self) -> Result<(), io::Error> {
         fs::create_dir_all("blocks")?;
+
+        self.save_bloom()?;
+        self.save_indexes()?;
 
         self.blocks
             .iter()
@@ -286,8 +285,6 @@ impl Database {
                 })?;
 
                 buffer.flush()
-            })?;
-
-        Ok(())
+            })
     }
 }
