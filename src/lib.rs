@@ -3,7 +3,7 @@ use murmur3::murmur3_x64_128_of_slice;
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::{self, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
@@ -218,27 +218,30 @@ impl Database {
         Ok(())
     }
 
-    /*pub fn save(&self) {
-        fs::create_dir_all("blocks").unwrap(); // TODO: Remove unwrap
+    pub fn save(&self) -> Result<(), io::Error> {
+        fs::create_dir_all("blocks")?;
 
-        self.blocks.iter().enumerate().for_each(|(index, block)| {
-            let mut file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(format!("blocks/{index}.zeta"))
-                .unwrap(); // TODO: Remove unwrap
+        self.blocks
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, block)| {
+                let file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(format!("blocks/{index}.zeta"))?;
 
-            let mut buffer = BytesMut::new();
-            buffer.put_u16(block.values.len() as u16);
+                let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
+                buffer.write_all(&block.values.len().to_le_bytes())?; // TODO: 2**64 is big
 
-            block.values.iter().for_each(|value| {
-                buffer.put_u64(value.len() as u64);
-                buffer.put(&compress_prepend_size(value.as_bytes())[..]);
-            });
+                block.values.iter().try_for_each(|value| {
+                    buffer.write_all(&value.len().to_le_bytes())?; // TODO: 2**64 is big
+                    buffer.write_all(value.as_bytes())
+                })?;
 
-            file.write_all(&buffer).unwrap(); // TODO: Remove unwrap
-            file.flush().unwrap(); // TODO: Remove unwrap
-        });
-    }*/
+                buffer.flush()
+            })?;
+
+        Ok(())
+    }
 }
