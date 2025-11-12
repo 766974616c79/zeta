@@ -16,9 +16,7 @@ pub const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
 const BLOCK_SIZE: usize = 8_192;
 
-#[derive(Debug)]
-pub struct Block {
-    // todo: remove pub
+struct Block {
     values: Vec<String>,
     indexes: AHashMap<String, Vec<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
@@ -96,15 +94,15 @@ impl Default for Block {
     }
 }
 
-/*impl Debug for Block {
+impl Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Block (len = {})", self.values.len())
     }
-}*/
+}
 
 #[derive(Default)]
 pub struct Database {
-    pub blocks: Vec<Block>, // todo: remove pub
+    blocks: Vec<Block>,
 }
 
 impl Database {
@@ -180,8 +178,6 @@ impl Database {
                         block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
                     }
                 }
-
-                println!("{:?}", block);
             }
         }
 
