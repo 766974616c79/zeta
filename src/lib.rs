@@ -234,21 +234,16 @@ impl Database {
                     let mut indexes_len_buffer = [0; 8];
                     buffer.read_exact(&mut indexes_len_buffer)?;
 
+                    let mut indexes = Vec::new();
                     for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
                         let mut index_buffer = [0; 8];
                         buffer.read_exact(&mut index_buffer)?;
 
                         let index = usize::from_le_bytes(index_buffer);
-                        match block.indexes.entry(word.clone()) {
-                            Entry::Occupied(mut entry) => {
-                                let values = entry.get_mut();
-                                values.push(index);
-                            }
-                            Entry::Vacant(entry) => {
-                                entry.insert(vec![index]);
-                            }
-                        }
+                        indexes.push(index);
                     }
+
+                    block.indexes.insert(word, indexes);
                 }
             }
         }

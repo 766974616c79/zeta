@@ -17,5 +17,5 @@ fn main() {
 
     database.load().unwrap();
 
-    println!("{:?}", database.get("Arthur"));
+    // println!("{:?}", database.get("Arthur"));
 }
