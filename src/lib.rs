@@ -20,9 +20,34 @@ struct Block {
     values: Vec<String>,
     indexes: AHashMap<String, Vec<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
+    loaded: bool,
 }
 
 impl Block {
+    fn load(&mut self, index: usize) -> Result<(), io::Error> {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(format!("blocks/{index}.zeta"))?;
+
+        let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
+        let mut values_len_buffer = [0; 8];
+        buffer.read_exact(&mut values_len_buffer)?;
+
+        for _ in 0..usize::from_le_bytes(values_len_buffer) {
+            let mut value_len_buffer = [0; 8];
+            buffer.read_exact(&mut value_len_buffer)?;
+
+            let value_len = usize::from_le_bytes(value_len_buffer);
+            let mut value_buffer = vec![0; value_len];
+            buffer.read_exact(&mut value_buffer)?;
+
+            let value = String::from_utf8(value_buffer).unwrap();
+            self.values.push(value);
+        }
+
+        Ok(())
+    }
+
     fn insert(&mut self, value: String) {
         let normalized_value: String = value
             .chars()
@@ -90,6 +115,7 @@ impl Default for Block {
             values: Vec::with_capacity(BLOCK_SIZE),
             indexes: Default::default(),
             bloom: [0; usize::div_ceil(BLOOM_SIZE as usize, 128)],
+            loaded: false,
         }
     }
 }
@@ -119,7 +145,7 @@ impl Database {
         }
     }
 
-    pub fn get(&self, value: &str) -> Vec<&String> {
+    pub fn get(&mut self, value: &str) -> Vec<&String> {
         let normalized_value: String = value
             .chars()
             .filter(|c| !c.is_ascii_punctuation())
@@ -127,9 +153,18 @@ impl Database {
 
         let words: Vec<&str> = normalized_value.split_ascii_whitespace().collect();
         self.blocks
-            .iter()
+            .iter_mut()
             .rev()
             .filter(|block| words.iter().all(|word| block.bloom_contains(word)))
+            .enumerate()
+            .map(|(index, block)| {
+                if !block.loaded {
+                    block.loaded = true;
+                    block.load(index).unwrap(); // TODO: remove unwrap
+                }
+
+                block
+            })
             .flat_map(|block| {
                 words
                     .iter()
@@ -148,7 +183,7 @@ impl Database {
             .collect()
     }
 
-    pub fn load_bloom(&mut self) -> Result<(), io::Error> {
+    fn load_bloom(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new().read(true).open("bloom.zeta")?;
         let mut buffer = BufReader::new(file);
         let mut blocks_len_buffer = [0; 8];
@@ -167,6 +202,7 @@ impl Database {
                 values: Vec::new(),
                 indexes: Default::default(),
                 bloom,
+                loaded: false,
             };
 
             self.blocks.push(block);
@@ -175,7 +211,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn load_indexes(&mut self) -> Result<(), io::Error> {
+    fn load_indexes(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new().read(true).open("indexes.zeta")?;
         let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut blocks_len_buffer = [0; 8];
@@ -202,13 +238,27 @@ impl Database {
                         let mut index_buffer = [0; 8];
                         buffer.read_exact(&mut index_buffer)?;
 
-                        block.index_insert(word.clone(), usize::from_le_bytes(index_buffer));
+                        let index = usize::from_le_bytes(index_buffer);
+                        match block.indexes.entry(word.clone()) {
+                            Entry::Occupied(mut entry) => {
+                                let values = entry.get_mut();
+                                values.push(index);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert(vec![index]);
+                            }
+                        }
                     }
                 }
             }
         }
 
         Ok(())
+    }
+
+    pub fn load(&mut self) -> Result<(), io::Error> {
+        self.load_bloom()?;
+        self.load_indexes()
     }
 
     fn save_bloom(&self) -> Result<(), io::Error> {
