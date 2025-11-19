@@ -1,4 +1,4 @@
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
     collections::hash_map::Entry,
@@ -16,9 +16,9 @@ pub const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
 const BLOCK_SIZE: usize = 8_192;
 
-struct Block {
+pub struct Block {
     values: Vec<String>,
-    indexes: AHashMap<String, Vec<usize>>,
+    indexes: AHashMap<String, AHashSet<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
     loaded: bool,
 }
@@ -48,7 +48,7 @@ impl Block {
         Ok(())
     }
 
-    fn insert(&mut self, value: String) {
+    pub fn insert(&mut self, value: String) {
         let normalized_value: String = value
             .chars()
             .filter(|c| !c.is_ascii_punctuation())
@@ -97,13 +97,13 @@ impl Block {
         match self.indexes.entry(target) {
             Entry::Occupied(mut entry) => {
                 let values = entry.get_mut();
-                if values.binary_search(&value).is_err() {
-                    values.push(value);
-                    values.sort_unstable();
-                }
+                values.insert(value);
             }
             Entry::Vacant(entry) => {
-                entry.insert(vec![value]);
+                let mut hashset: AHashSet<usize> = Default::default();
+                hashset.insert(value);
+
+                entry.insert(hashset);
             }
         }
     }
@@ -132,17 +132,8 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn insert(&mut self, value: String) {
-        if let Some(block) = self.blocks.last_mut()
-            && block.values.len() != BLOCK_SIZE
-        {
-            block.insert(value);
-        } else {
-            let mut block = Block::default();
-            block.insert(value);
-
-            self.blocks.push(block);
-        }
+    pub fn insert(&mut self, block: Block) {
+        self.blocks.push(block);
     }
 
     pub fn get(&mut self, value: &str) -> Vec<&String> {
@@ -234,13 +225,13 @@ impl Database {
                     let mut indexes_len_buffer = [0; 8];
                     buffer.read_exact(&mut indexes_len_buffer)?;
 
-                    let mut indexes = Vec::new();
+                    let mut indexes: AHashSet<usize> = Default::default();
                     for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
                         let mut index_buffer = [0; 8];
                         buffer.read_exact(&mut index_buffer)?;
 
                         let index = usize::from_le_bytes(index_buffer);
-                        indexes.push(index);
+                        indexes.insert(index);
                     }
 
                     block.indexes.insert(word, indexes);

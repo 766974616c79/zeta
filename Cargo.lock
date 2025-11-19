@@ -1782,4 +1782,5 @@ dependencies = [
  "hotpath",
  "lz4_flex",
  "murmur3",
+ "rayon",
 ]
