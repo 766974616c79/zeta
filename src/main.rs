@@ -4,7 +4,7 @@ use zeta::{Block, Database};
 #[cfg_attr(feature = "hotpath", hotpath::main(percentiles = [99]))]
 fn main() {
     let mut database = Database::default();
-    let blocks: Vec<Block> = (0..1000).into_par_iter().map(|_| {
+    /*let mut blocks: Vec<Block> = (0..1000).into_par_iter().map(|_| {
         let mut block = Block::default();
         for _ in 0..8192 {
             block.insert(String::from(
@@ -15,12 +15,19 @@ fn main() {
         block
     }).collect();
 
+    let mut last = Block::default();
+    last.insert(String::from("Arthur"));
+
+    blocks.push(last);
+
     for block in blocks {
         database.insert(block);
     }
 
-    /*database.save().unwrap();
-    database.load().unwrap();*/
+    database.save().unwrap();*/
 
-    // println!("{:?}", database.get("Arthur"));
+    database.load().unwrap();
+
+    println!("loaded");
+    println!("{:?}", database.get("Arthur"));
 }

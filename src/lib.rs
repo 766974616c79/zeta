@@ -7,6 +7,7 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
+use uuid::Uuid;
 
 // Thanks:
 // - https://www.geeksforgeeks.org/python/bloom-filters-introduction-and-python-implementation/
@@ -17,6 +18,7 @@ const BLOOM_HASHES: u128 = 3;
 const BLOCK_SIZE: usize = 8_192;
 
 pub struct Block {
+    uuid: Uuid,
     values: Vec<String>,
     indexes: AHashMap<String, AHashSet<usize>>,
     bloom: [u128; usize::div_ceil(BLOOM_SIZE as usize, 128)],
@@ -24,10 +26,10 @@ pub struct Block {
 }
 
 impl Block {
-    fn load(&mut self, index: usize) -> Result<(), io::Error> {
+    fn load(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new()
             .read(true)
-            .open(format!("blocks/{index}.zeta"))?;
+            .open(format!("blocks/{}.zeta", self.uuid))?;
 
         let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut values_len_buffer = [0; 8];
@@ -112,6 +114,7 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
+            uuid: Uuid::new_v4(),
             values: Vec::with_capacity(BLOCK_SIZE),
             indexes: Default::default(),
             bloom: [0; usize::div_ceil(BLOOM_SIZE as usize, 128)],
@@ -147,11 +150,10 @@ impl Database {
             .iter_mut()
             .rev()
             .filter(|block| words.iter().all(|word| block.bloom_contains(word)))
-            .enumerate()
-            .map(|(index, block)| {
+            .map(|block| {
                 if !block.loaded {
                     block.loaded = true;
-                    block.load(index).unwrap(); // TODO: remove unwrap
+                    block.load().unwrap(); // TODO: remove unwrap
                 }
 
                 block
@@ -181,6 +183,10 @@ impl Database {
         buffer.read_exact(&mut blocks_len_buffer)?;
 
         for _ in 0..usize::from_le_bytes(blocks_len_buffer) {
+            let mut uuid_buffer = [0; 16];
+            buffer.read_exact(&mut uuid_buffer)?;
+
+            let uuid = Uuid::from_bytes(uuid_buffer);
             let mut bloom = [0; usize::div_ceil(BLOOM_SIZE as usize, 128)];
             for i in 0..usize::div_ceil(BLOOM_SIZE as usize, 128) {
                 let mut bitset_buffer = [0; 16];
@@ -190,6 +196,7 @@ impl Database {
             }
 
             let block = Block {
+                uuid,
                 values: Vec::new(),
                 indexes: Default::default(),
                 bloom,
@@ -202,40 +209,50 @@ impl Database {
         Ok(())
     }
 
+    fn find_block_by_uuid(&mut self, uuid: Uuid) -> &mut Block {
+        self.blocks
+            .iter_mut()
+            .find(|block| block.uuid == uuid)
+            .unwrap()
+    }
+
     fn load_indexes(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new().read(true).open("indexes.zeta")?;
         let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut blocks_len_buffer = [0; 8];
         buffer.read_exact(&mut blocks_len_buffer)?;
 
-        for i in 0..usize::from_le_bytes(blocks_len_buffer) {
-            if let Some(block) = self.blocks.get_mut(i) {
+        for _ in 0..usize::from_le_bytes(blocks_len_buffer) {
+            let mut uuid_buffer = [0; 16];
+            buffer.read_exact(&mut uuid_buffer)?;
+
+            let uuid = Uuid::from_bytes(uuid_buffer);
+            let block = self.find_block_by_uuid(uuid);
+            let mut indexes_len_buffer = [0; 8];
+            buffer.read_exact(&mut indexes_len_buffer)?;
+
+            for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
+                let mut word_len_buffer = [0; 8];
+                buffer.read_exact(&mut word_len_buffer)?;
+
+                let word_len = usize::from_le_bytes(word_len_buffer);
+                let mut word_buffer = vec![0; word_len];
+                buffer.read_exact(&mut word_buffer)?;
+
+                let word = String::from_utf8(word_buffer).unwrap();
                 let mut indexes_len_buffer = [0; 8];
                 buffer.read_exact(&mut indexes_len_buffer)?;
 
+                let mut indexes: AHashSet<usize> = Default::default();
                 for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
-                    let mut word_len_buffer = [0; 8];
-                    buffer.read_exact(&mut word_len_buffer)?;
+                    let mut index_buffer = [0; 8];
+                    buffer.read_exact(&mut index_buffer)?;
 
-                    let word_len = usize::from_le_bytes(word_len_buffer);
-                    let mut word_buffer = vec![0; word_len];
-                    buffer.read_exact(&mut word_buffer)?;
-
-                    let word = String::from_utf8(word_buffer).unwrap();
-                    let mut indexes_len_buffer = [0; 8];
-                    buffer.read_exact(&mut indexes_len_buffer)?;
-
-                    let mut indexes: AHashSet<usize> = Default::default();
-                    for _ in 0..usize::from_le_bytes(indexes_len_buffer) {
-                        let mut index_buffer = [0; 8];
-                        buffer.read_exact(&mut index_buffer)?;
-
-                        let index = usize::from_le_bytes(index_buffer);
-                        indexes.insert(index);
-                    }
-
-                    block.indexes.insert(word, indexes);
+                    let index = usize::from_le_bytes(index_buffer);
+                    indexes.insert(index);
                 }
+
+                block.indexes.insert(word, indexes);
             }
         }
 
@@ -259,6 +276,8 @@ impl Database {
         buffer.write_all(&self.blocks.len().to_le_bytes())?;
 
         self.blocks.iter().try_for_each(|block| {
+            buffer.write_all(block.uuid.as_bytes())?;
+
             block
                 .bloom
                 .iter()
@@ -280,6 +299,7 @@ impl Database {
         buffer.write_all(&self.blocks.len().to_le_bytes())?;
 
         self.blocks.iter().try_for_each(|block| {
+            buffer.write_all(block.uuid.as_bytes())?;
             buffer.write_all(&block.indexes.len().to_le_bytes())?; // TODO: 2**64 is big
 
             block.indexes.iter().try_for_each(|(word, indexes)| {
@@ -302,25 +322,22 @@ impl Database {
         self.save_bloom()?;
         self.save_indexes()?;
 
-        self.blocks
-            .iter()
-            .enumerate()
-            .try_for_each(|(index, block)| {
-                let file = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true)
-                    .open(format!("blocks/{index}.zeta"))?;
+        self.blocks.iter().try_for_each(|block| {
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(format!("blocks/{}.zeta", block.uuid))?;
 
-                let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
-                buffer.write_all(&block.values.len().to_le_bytes())?; // TODO: 2**64 is big
+            let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
+            buffer.write_all(&block.values.len().to_le_bytes())?; // TODO: 2**64 is big
 
-                block.values.iter().try_for_each(|value| {
-                    buffer.write_all(&value.len().to_le_bytes())?; // TODO: 2**64 is big
-                    buffer.write_all(value.as_bytes())
-                })?;
+            block.values.iter().try_for_each(|value| {
+                buffer.write_all(&value.len().to_le_bytes())?; // TODO: 2**64 is big
+                buffer.write_all(value.as_bytes())
+            })?;
 
-                buffer.flush()
-            })
+            buffer.flush()
+        })
     }
 }
