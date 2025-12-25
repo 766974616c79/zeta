@@ -27,3 +27,5 @@ hotpath-off = ["hotpath/hotpath-off"]
 
 [profile.release]
 debug = true
+codegen-units = 1
+lto = false
