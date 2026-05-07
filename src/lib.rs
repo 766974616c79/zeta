@@ -1,10 +1,11 @@
 // TODO:
 // - Better perf
 // - More complex example
-// - No unwrap 
+// - No unwrap
 
 use ahash::{AHashMap, AHashSet};
 use murmur3::murmur3_x64_128_of_slice;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::hash_map::Entry,
     fmt::Debug,
@@ -145,10 +146,6 @@ impl Block {
         self.indexes.clear();
     }
 
-    pub fn cleanup(&mut self) {
-        self.indexes.clear();
-    }
-
     fn bloom_insert(&mut self, target: &str) {
         let word_hash = murmur3_x64_128_of_slice(target.as_bytes(), 0);
         let step_hash = word_hash as u64 as u128;
@@ -195,9 +192,18 @@ impl Debug for Block {
     }
 }
 
-#[derive(Default)]
 pub struct Database {
     blocks: Vec<Block>,
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        _ = fs::create_dir_all("blocks");
+
+        Self {
+            blocks: Default::default(),
+        }
+    }
 }
 
 impl Database {
@@ -299,11 +305,8 @@ impl Database {
     }
 
     pub fn save(&self) -> Result<(), io::Error> {
-        fs::create_dir_all("blocks")?;
-
         self.save_bloom()?;
-
-        self.blocks.iter().try_for_each(|block| {
+        self.blocks.par_iter().try_for_each(|block| {
             let file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -311,14 +314,14 @@ impl Database {
                 .open(format!("blocks/{}.block", block.uuid))?;
 
             let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
-            buffer.write_all(&block.values.len().to_le_bytes())?; // TODO: 2**64 is big
+            buffer.write_all(&block.values.len().to_le_bytes())?;
 
             block.values.iter().try_for_each(|value| {
-                buffer.write_all(&value.len().to_le_bytes())?; // TODO: 2**64 is big
+                buffer.write_all(&value.len().to_le_bytes())?;
                 buffer.write_all(value.as_bytes())
             })?;
 
-            buffer.flush()
+            Ok(())
         })
     }
 }

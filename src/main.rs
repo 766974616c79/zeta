@@ -4,8 +4,6 @@ use zeta::{Block, Database};
 #[cfg_attr(feature = "hotpath", hotpath::main(percentiles = [99]))]
 fn main() {
     let mut database = Database::default();
-
-    /*_ = std::fs::create_dir("blocks");
     let mut blocks: Vec<Block> = (0..1000).into_par_iter().map(|_| {
         let mut block = Block::default();
         for _ in 0..8192 {
@@ -28,10 +26,10 @@ fn main() {
         database.insert(block);
     }
 
-    database.save().unwrap();*/
+    database.save().unwrap();
 
-    database.load().unwrap();
+    /*database.load().unwrap();
 
     println!("loaded");
-    println!("{:?}", database.get("Arthur"));
+    println!("{:?}", database.get("Arthur"));*/
 }
