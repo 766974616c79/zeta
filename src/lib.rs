@@ -247,7 +247,7 @@ impl Database {
 
     fn load_bloom(&mut self) -> Result<(), io::Error> {
         let file = OpenOptions::new().read(true).open("bloom.zeta")?;
-        let mut buffer = BufReader::new(file);
+        let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut blocks_len_buffer = [0; 8];
         buffer.read_exact(&mut blocks_len_buffer)?;
 
@@ -289,7 +289,7 @@ impl Database {
             .truncate(true)
             .open("bloom.zeta")?;
 
-        let mut buffer = BufWriter::new(file);
+        let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
         buffer.write_all(&self.blocks.len().to_le_bytes())?;
 
         self.blocks.iter().try_for_each(|block| {
