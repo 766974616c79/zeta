@@ -10,7 +10,7 @@ use std::{
     collections::hash_map::Entry,
     fmt::Debug,
     fs::{self, OpenOptions},
-    io::{self, BufReader, BufWriter, Read, Write},
+    io::{self, Read, Write},
     ops::{BitAnd, BitOrAssign, Shl, Shr},
 };
 use uuid::Uuid;
@@ -96,7 +96,7 @@ impl Block {
             .open(format!("blocks/{}.index", self.uuid))
             .unwrap();
 
-        let mut buffer = BufReader::new(file);
+        let mut buffer = lz4_flex::frame::FrameDecoder::new(file);
         let mut len_buffer = [0; 8];
         buffer.read_exact(&mut len_buffer).unwrap();
 
@@ -133,7 +133,7 @@ impl Block {
             .open(format!("blocks/{}.index", self.uuid))
             .unwrap();
 
-        let mut buffer = BufWriter::new(file);
+        let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
         buffer.write_all(&self.indexes.len().to_le_bytes()).unwrap();
 
         self.indexes.iter().for_each(|(word, indexes)| {
