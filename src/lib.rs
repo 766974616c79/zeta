@@ -1,3 +1,8 @@
+// TODO:
+// - Better perf
+// - More complex example
+// - No unwrap 
+
 use ahash::{AHashMap, AHashSet};
 use murmur3::murmur3_x64_128_of_slice;
 use std::{
