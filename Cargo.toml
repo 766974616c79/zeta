@@ -17,6 +17,7 @@ ahash = "0.8.12"
 lz4_flex = "0.12"
 rayon = "1.11.0"
 uuid = { version = "1.18.1", features = ["v4"] }
+mimalloc = "0.1.50"
 
 [features]
 hotpath = ["dep:hotpath", "hotpath/hotpath"]

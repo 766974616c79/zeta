@@ -12,13 +12,11 @@ fn main() {
             ));
         }
 
-        block.save_indexes();
         block
     }).collect();
 
     let mut last = Block::default();
     last.insert(String::from("Arthur"));
-    last.save_indexes();
 
     blocks.push(last);
 

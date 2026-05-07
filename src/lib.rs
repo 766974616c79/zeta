@@ -23,6 +23,9 @@ pub const BLOOM_SIZE: u128 = 128_966;
 const BLOOM_HASHES: u128 = 3;
 const BLOCK_SIZE: usize = 8_192;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub struct Block {
     uuid: Uuid,
     values: Vec<String>,
@@ -121,7 +124,7 @@ impl Block {
         }
     }
 
-    pub fn save_indexes(&mut self) {
+    pub fn save_indexes(&self) {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -142,8 +145,6 @@ impl Block {
                 buffer.write_all(&index.to_le_bytes()).unwrap();
             });
         });
-
-        self.indexes.clear();
     }
 
     fn bloom_insert(&mut self, target: &str) {
@@ -281,6 +282,35 @@ impl Database {
         self.load_bloom()
     }
 
+    fn save_blocks(&self) {
+        self.blocks.par_iter().for_each(|block| {
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(format!("blocks/{}.block", block.uuid))
+                .unwrap();
+
+            let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
+            buffer.write_all(&block.values.len().to_le_bytes()).unwrap();
+
+            block
+                .values
+                .iter()
+                .try_for_each(|value| {
+                    buffer.write_all(&value.len().to_le_bytes())?;
+                    buffer.write_all(value.as_bytes())
+                })
+                .unwrap();
+        })
+    }
+
+    fn save_indexes(&self) {
+        self.blocks.par_iter().for_each(|block| {
+            block.save_indexes();
+        });
+    }
+
     fn save_bloom(&self) -> Result<(), io::Error> {
         let file = OpenOptions::new()
             .read(true)
@@ -299,29 +329,16 @@ impl Database {
                 .bloom
                 .iter()
                 .try_for_each(|bitset| buffer.write_all(&bitset.to_le_bytes()))
-        })?;
-
-        buffer.flush()
+        })
     }
 
     pub fn save(&self) -> Result<(), io::Error> {
-        self.save_bloom()?;
-        self.blocks.par_iter().try_for_each(|block| {
-            let file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(format!("blocks/{}.block", block.uuid))?;
+        rayon::scope(|s| {
+            s.spawn(|_| self.save_blocks());
+            s.spawn(|_| self.save_indexes());
+            s.spawn(|_| self.save_bloom().unwrap());
+        });
 
-            let mut buffer = lz4_flex::frame::FrameEncoder::new(file);
-            buffer.write_all(&block.values.len().to_le_bytes())?;
-
-            block.values.iter().try_for_each(|value| {
-                buffer.write_all(&value.len().to_le_bytes())?;
-                buffer.write_all(value.as_bytes())
-            })?;
-
-            Ok(())
-        })
+        Ok(())
     }
 }
